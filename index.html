@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏆 排序演算法精熟度測驗</title>
+    <!-- 引入外部函式庫 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;700;900&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        body { font-family: 'M PLUS Rounded 1c', sans-serif; -webkit-touch-callout: none; background-color: #f0f4f8; }
+        .animate-shake { animation: shake 0.5s; }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+        .cursor-grab { cursor: grab; }
+        .cursor-grab:active { cursor: grabbing; }
+        .custom-scrollbar::-webkit-scrollbar { width: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 10px; }
+        .screenshot-mode input { caret-color: transparent; }
+        .card-reveal { transition: all 0.25s ease-out; }
+        @keyframes popIn { 0% { transform: scale(0.9); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+        .certificate-pop { animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .name-input { border-bottom: 2px dashed #fbbf24; background: transparent; text-align: center; outline: none; width: 180px; color: #d97706; font-weight: 900; }
+        .sync-status { font-size: 10px; font-weight: bold; }
+        
+        .login-input {
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 10px 16px;
+            width: 100%;
+            outline: none;
+            transition: all 0.3s;
+            font-weight: 700;
+        }
+        .login-input:focus { border-color: #3b82f6; box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1); }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, Fragment, useMemo } = React;
+
+        const GAS_URL = "https://script.google.com/macros/s/AKfycbyXKXlElisg8zvG62zNEK4cK9uSrWAV6zTpSCtbgHco2iwjXkZ0dcZb6DyvYIhzqM9k/exec"; 
+
+        const IconCheck = ({ size = 24 }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+        );
+        const IconX = ({ size = 24 }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        );
+
+        const App = () => {
+            const [isRegistered, setIsRegistered] = useState(false);
+            const [rawUserInfo, setRawUserInfo] = useState({ classNum: '', seatNum: '', realName: '' });
+            const [studentName, setStudentName] = useState(""); 
+            const [activeTab, setActiveTab] = useState('insertion');
+            
+            const [algoPhases, setAlgoPhases] = useState({ insertion: 1, selection: 1, bubble: 1 });
+            
+            const [showCertificate, setShowCertificate] = useState(false);
+            const [isCapturing, setIsCapturing] = useState(false);
+            const [focusedId, setFocusedId] = useState(null);
+            const [syncing, setSyncing] = useState(false);
+            const cardRef = useRef(null);
+
+            const theme = useMemo(() => {
+                switch (activeTab) {
+                    case 'selection': return { primary: 'bg-[#E3FFE7]', secondary: 'bg-[#C6F6D5]', text: 'text-[#22543D]', border: 'border-[#9AE6B4]', highlight: 'bg-[#B2F5EA]', tab: 'bg-[#48BB78]' };
+                    case 'bubble': return { primary: 'bg-[#EAE6FF]', secondary: 'bg-[#DDD6FE]', text: 'text-[#4C1D95]', border: 'border-[#A78BFA]', highlight: 'bg-[#DDD6FE]', tab: 'bg-[#8B5CF6]' };
+                    default: return { primary: 'bg-[#FFDEE9]', secondary: 'bg-[#FED7E2]', text: 'text-[#702459]', border: 'border-[#FBB6CE]', highlight: 'bg-[#FED7E2]', tab: 'bg-[#ED64A6]' };
+                }
+            }, [activeTab]);
+
+            const [allOriginalData, setAllOriginalData] = useState({ insertion: [], selection: [], bubble: [] });
+            
+            const getInitialStructure = (algo = null) => {
+                const structures = {
+                    insertion: Array(5).fill(0).map(() => Array(6).fill('')),
+                    selection: Array(5).fill(0).map(() => Array(6).fill('')),
+                    bubble: [
+                        Array(5).fill(0).map(() => Array(6).fill('')), 
+                        Array(4).fill(0).map(() => Array(6).fill('')), 
+                        Array(3).fill(0).map(() => Array(6).fill('')), 
+                        Array(2).fill(0).map(() => Array(6).fill('')), 
+                        Array(1).fill(0).map(() => Array(6).fill(''))  
+                    ]
+                };
+                return algo ? structures[algo] : structures;
+            };
+
+            const [allUserAnswers, setAllUserAnswers] = useState(getInitialStructure());
+            const [allResults, setAllResults] = useState({ insertion: [], selection: [], bubble: [] });
+            const [allStats, setAllStats] = useState({
+                insertion: { drag: 0, check: 0, time: 0, startTime: null },
+                selection: { drag: 0, check: 0, time: 0, startTime: null },
+                bubble: { drag: 0, check: 0, time: 0, startTime: null }
+            });
+            const [historyScores, setHistoryScores] = useState({});
+
+            const getRandomNumbers = () => {
+                const nums = new Set();
+                while(nums.size < 6) nums.add(Math.floor(Math.random() * 100));
+                return [...nums];
+            };
+
+            const generateTestData = (algo, currentPhase) => {
+                let pool = getRandomNumbers();
+                if (currentPhase === 1) return pool;
+                pool.sort((a, b) => a - b);
+                if (algo === 'bubble') { const max = pool.pop(); return [max, ...pool]; }
+                const min = pool.shift(); return [...pool, min]; 
+            };
+
+            useEffect(() => {
+                setAllOriginalData({
+                    insertion: generateTestData('insertion', 1),
+                    selection: generateTestData('selection', 1),
+                    bubble: generateTestData('bubble', 1)
+                });
+            }, []);
+
+            const solutions = useMemo(() => {
+                const dataObj = allOriginalData;
+                const result = { insertion: [], selection: [], bubble: [] };
+                
+                ['insertion', 'selection', 'bubble'].forEach(algo => {
+                    const d = [...(dataObj[algo] || [])];
+                    if (d.length === 0) return;
+                    
+                    if (algo === 'insertion') {
+                        let ins = [...d];
+                        for (let i = 1; i < 6; i++) {
+                            let k = ins[i], j = i - 1;
+                            while (j >= 0 && ins[j] > k) { ins[j + 1] = ins[j]; j--; }
+                            ins[j + 1] = k; result.insertion.push([...ins]);
+                        }
+                    } else if (algo === 'selection') {
+                        let sel = [...d];
+                        for (let i = 0; i < 5; i++) {
+                            let m = i;
+                            for (let j = i + 1; j < 6; j++) if (sel[j] < sel[m]) m = j;
+                            [sel[i], sel[m]] = [sel[m], sel[i]]; result.selection.push([...sel]);
+                        }
+                    } else if (algo === 'bubble') {
+                        let bub = [...d];
+                        const bubRes = [];
+                        for (let r = 0; r < 5; r++) {
+                            const roundSteps = [];
+                            for (let s = 0; s < 5 - r; s++) {
+                                const idxA = 5 - s; const idxB = 4 - s;
+                                if (bub[idxA] < bub[idxB]) [bub[idxA], bub[idxB]] = [bub[idxB], bub[idxA]];
+                                roundSteps.push([...bub]);
+                            }
+                            bubRes.push(roundSteps);
+                        }
+                        result.bubble = bubRes;
+                    }
+                });
+                return result;
+            }, [allOriginalData]);
+
+            const currentAnswers = allUserAnswers[activeTab];
+            const currentResults = allResults[activeTab];
+            const currentStats = allStats[activeTab];
+            const phase = algoPhases[activeTab];
+            const originalData = allOriginalData[activeTab] || [];
+            const isTabLocked = currentResults && currentResults.length > 0;
+
+            const calculateScore = () => {
+                const sol = solutions[activeTab];
+                if (activeTab === 'bubble') {
+                    let totalSteps = 0, correctSteps = 0;
+                    const newRes = currentAnswers.map((round, rIdx) => {
+                        return round.map((step, sIdx) => {
+                            totalSteps++;
+                            const isOk = step.every((v, cIdx) => parseInt(v) === sol[rIdx][sIdx][cIdx]);
+                            if (isOk) correctSteps++;
+                            return isOk;
+                        });
+                    });
+                    return { score: Math.round((correctSteps / totalSteps) * 100), results: newRes };
+                } else {
+                    let correctRounds = 0;
+                    const newRes = currentAnswers.map((round, rIdx) => {
+                        const isOk = round.every((v, cIdx) => parseInt(v) === sol[rIdx][cIdx]);
+                        if (isOk) correctRounds++;
+                        return isOk;
+                    });
+                    return { score: Math.round((correctRounds / 5) * 100), results: newRes };
+                }
+            };
+
+            const currentScore = useMemo(() => {
+                if (!isTabLocked) return null;
+                if (activeTab === 'bubble') {
+                    let total = 0, correct = 0;
+                    currentResults.forEach(r => r.forEach(s => { total++; if(s) correct++; }));
+                    return Math.round((correct / total) * 100);
+                }
+                return Math.round((currentResults.filter(r => r === true).length / 5) * 100);
+            }, [currentResults, activeTab, isTabLocked]);
+
+            const resetCurrentAlgoOnly = () => {
+                if (isTabLocked) return;
+                setAllUserAnswers(prev => ({ ...prev, [activeTab]: getInitialStructure(activeTab) }));
+                setFocusedId(null);
+            };
+
+            const handleEnterPhase2 = () => {
+                const newPhase = 2;
+                const newData = generateTestData(activeTab, newPhase);
+                setAlgoPhases(prev => ({ ...prev, [activeTab]: newPhase }));
+                setAllOriginalData(prev => ({ ...prev, [activeTab]: newData }));
+                setAllUserAnswers(prev => ({ ...prev, [activeTab]: getInitialStructure(activeTab) }));
+                setAllResults(prev => ({ ...prev, [activeTab]: [] }));
+                setAllStats(prev => ({ ...prev, [activeTab]: { drag: 0, check: 0, time: 0, startTime: null } }));
+                setFocusedId(null);
+            };
+
+            const handleValueUpdate = (rIdx, cIdx, val, sIdx = null) => {
+                if (isTabLocked) return;
+                const valStr = String(val || "").replace(/[^0-9]/g, '').slice(-2);
+                setAllStats(prev => ({ ...prev, [activeTab]: { ...prev[activeTab], drag: prev[activeTab].drag + 1, startTime: prev[activeTab].startTime || Date.now() } }));
+                setAllUserAnswers(prev => {
+                    const updatedAlgo = JSON.parse(JSON.stringify(prev[activeTab]));
+                    if (activeTab === 'bubble') {
+                        updatedAlgo[rIdx][sIdx][cIdx] = valStr;
+                        const lastStepOfRound = updatedAlgo[rIdx].length - 1;
+                        if (sIdx === lastStepOfRound && cIdx === rIdx) {
+                            for (let i = rIdx + 1; i < 5; i++) {
+                                for (let k = 0; k < updatedAlgo[i].length; k++) { updatedAlgo[i][k][cIdx] = valStr; }
+                            }
+                        }
+                    } else {
+                        updatedAlgo[rIdx][cIdx] = valStr;
+                        if (activeTab === 'selection' && cIdx <= rIdx) {
+                            for (let i = rIdx + 1; i < 5; i++) updatedAlgo[i][cIdx] = valStr;
+                        }
+                    }
+                    return { ...prev, [activeTab]: updatedAlgo };
+                });
+            };
+
+            const checkScore = async () => {
+                if (isTabLocked) return;
+                const { score, results } = calculateScore();
+                const timeSpent = currentStats.startTime ? Math.floor((Date.now() - currentStats.startTime) / 1000) : 0;
+                setAllResults(prev => ({ ...prev, [activeTab]: results }));
+                setAllStats(prev => ({ ...prev, [activeTab]: { ...prev[activeTab], time: timeSpent, check: prev[activeTab].check + 1 } }));
+                setHistoryScores(prev => ({ ...prev, [`${activeTab}_p${phase}`]: { score, drag: allStats[activeTab].drag, time: timeSpent, phase, name: activeTab } }));
+                if (GAS_URL) {
+                    setSyncing(true);
+                    try {
+                        await fetch(GAS_URL, { method: 'POST', mode: 'no-cors', cache: 'no-cache', body: JSON.stringify({ studentName, algo: activeTab, phase, score, dragCount: allStats[activeTab].drag, timeSpent, originalData, answers: allUserAnswers[activeTab] }) });
+                    } catch (e) {} finally { setSyncing(false); }
+                }
+            };
+
+            const handleKeyDown = (e, r, c, s = null) => {
+                if (isTabLocked) return;
+                let t = null;
+                const prefix = activeTab === 'bubble' ? `in-${r}-${s}-` : `in-${r}-`;
+                if (e.key === 'ArrowRight') t = document.getElementById(`${prefix}${c + 1}`);
+                else if (e.key === 'ArrowLeft') t = document.getElementById(`${prefix}${c - 1}`);
+                else if (e.key === 'ArrowUp') {
+                    if (activeTab === 'bubble' && s > 0) t = document.getElementById(`in-${r}-${s-1}-${c}`);
+                    else t = document.getElementById(`in-${r - 1}-${c}`);
+                }
+                else if (e.key === 'ArrowDown') {
+                    if (activeTab === 'bubble' && s < allUserAnswers.bubble[r].length - 1) t = document.getElementById(`in-${r}-${s+1}-${c}`);
+                    else t = document.getElementById(`in-${r + 1}-${c}`);
+                }
+                if (t) { e.preventDefault(); t.focus(); setFocusedId(t.id.replace('in-', '')); }
+            };
+
+            const SortBox = ({ value, id, isSorted, isBubbleBox, rIdx, cIdx, sIdx = null }) => {
+                const isFocused = focusedId === id;
+                const handleDrop = (e) => { e.preventDefault(); if (isTabLocked) return; const data = e.dataTransfer.getData("text/plain"); if (data) handleValueUpdate(rIdx, cIdx, data, sIdx); };
+                return (
+                    <div className={`group relative w-12 h-12 flex items-center justify-center rounded-xl transition-all shadow-md border-4 ${isFocused ? 'ring-4 ring-blue-300 scale-110 z-10' : ''} ${isBubbleBox ? 'border-red-500 bg-white scale-110 z-20 shadow-lg' : isSorted ? `${theme.highlight} border-transparent` : 'bg-gray-100 border-gray-200'} ${!isSorted ? (isTabLocked ? '' : 'hover:bg-white hover:border-blue-400 cursor-grab') : ''}`} onClick={() => !isTabLocked && setFocusedId(id)} onDragOver={(e) => !isTabLocked && e.preventDefault()} onDrop={handleDrop} draggable={!isFocused && value !== '' && !isTabLocked} onDragStart={(e) => { if (focusedId === id || !value || isTabLocked) { e.preventDefault(); return; } e.dataTransfer.setData("text/plain", value); }}>
+                        {!isSorted && <div className={`absolute inset-0 z-10 flex items-center justify-center bg-gray-200 rounded-lg text-gray-400 font-black text-lg transition-opacity ${!isTabLocked ? 'group-hover:opacity-0' : ''} ${isFocused ? 'opacity-0' : 'opacity-100'}`}>?</div>}
+                        <input id={`in-${id}`} type="text" inputMode="numeric" value={value} onKeyDown={(e) => handleKeyDown(e, rIdx, cIdx, sIdx)} onChange={(e) => handleValueUpdate(rIdx, cIdx, e.target.value, sIdx)} disabled={isTabLocked} className={`w-full h-full bg-transparent text-center text-xl font-black focus:outline-none ${isSorted ? theme.text : 'text-gray-500 ' + (!isTabLocked ? 'group-hover:text-black' : '')} ${!isSorted && !isFocused && !isTabLocked ? 'opacity-0 group-hover:opacity-100' : 'opacity-100'}`} />
+                    </div>
+                );
+            };
+
+            if (!isRegistered) {
+                return (
+                    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 text-slate-800">
+                        <div className="w-full max-w-md bg-white rounded-[40px] shadow-2xl p-10 certificate-pop text-center">
+                            <div className="bg-amber-100 p-4 rounded-full mb-6 inline-block"><span className="text-5xl">🍭</span></div>
+                            <h1 className="text-3xl font-black mb-2">排序演算法測驗</h1>
+                            <form onSubmit={(e) => { e.preventDefault(); if (rawUserInfo.classNum && rawUserInfo.seatNum && rawUserInfo.realName) { setStudentName(`${rawUserInfo.classNum}-${rawUserInfo.seatNum}-${rawUserInfo.realName}`); setIsRegistered(true); } }} className="w-full space-y-5">
+                                <div><label className="block text-left text-sm font-bold text-slate-600 mb-2 px-1">班級</label><input type="text" placeholder="例：805" className="login-input" value={rawUserInfo.classNum} onChange={(e) => setRawUserInfo({...rawUserInfo, classNum: e.target.value})} required /></div>
+                                <div><label className="block text-left text-sm font-bold text-slate-600 mb-2 px-1">座號</label><input type="number" placeholder="例：12" className="login-input" value={rawUserInfo.seatNum} onChange={(e) => setRawUserInfo({...rawUserInfo, seatNum: e.target.value})} required /></div>
+                                <div><label className="block text-left text-sm font-bold text-slate-600 mb-2 px-1">姓名</label><input type="text" placeholder="你的全名" className="login-input" value={rawUserInfo.realName} onChange={(e) => setRawUserInfo({...rawUserInfo, realName: e.target.value})} required /></div>
+                                <button type="submit" className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl shadow-xl hover:bg-blue-700 mt-4 text-xl">開始挑戰 🚀</button>
+                            </form>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className={`min-h-screen p-4 transition-colors duration-700 ${theme.primary} flex items-start justify-center select-none text-slate-800`}>
+                    <div ref={cardRef} className="w-full max-w-5xl bg-white/95 backdrop-blur-md shadow-2xl rounded-[50px] p-8 border-[10px] border-white relative overflow-y-auto custom-scrollbar min-h-[95vh]">
+                        <div className="flex justify-between items-center mb-6">
+                            <div className="flex items-center gap-3">
+                                <span className={`px-4 py-1.5 rounded-full text-white font-black text-sm shadow-md ${phase === 1 ? 'bg-sky-400' : 'bg-rose-500 animate-pulse'}`}>{phase === 1 ? '第一戰：基礎隨機' : '第二戰：典型挑戰'}</span>
+                                {currentScore !== null && <span className="text-2xl font-black text-amber-500">得分：{currentScore} 分</span>}
+                                {syncing && <span className="sync-status text-amber-600 animate-pulse ml-2">雲端同步中...</span>}
+                            </div>
+                            <h1 className={`text-3xl font-[900] ${theme.text} tracking-tighter text-center`}>🏆 排序演算法精熟度測驗</h1>
+                            <button onClick={() => setShowCertificate(true)} className="bg-amber-400 text-white px-6 py-2 rounded-full font-black shadow-lg hover:scale-105 active:scale-95 transition-transform flex items-center gap-2">🎖️ 證書</button>
+                        </div>
+                        <div className="flex flex-col items-center gap-4 mb-8">
+                            <div className="flex gap-3">
+                                {['insertion', 'selection', 'bubble'].map(tab => (
+                                    <button key={tab} onClick={() => setActiveTab(tab)} className={`px-8 py-2.5 rounded-full font-black transition-all ${activeTab === tab ? `${theme.tab} text-white shadow-xl` : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}>{({insertion:'插入', selection:'選擇', bubble:'氣泡'}[tab])}排序</button>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="flex flex-col items-center space-y-4">
+                            <div className="flex items-center justify-center w-full gap-4">
+                                <div className={`w-32 py-2.5 rounded-xl border-2 ${theme.border} ${theme.secondary} ${theme.text} font-black text-center text-xs shadow-sm`}>原始資料</div>
+                                <div className="flex gap-2">
+                                    {originalData.map((num, idx) => (
+                                        <div key={idx} draggable={!isTabLocked} onDragStart={(e) => { if (isTabLocked) return; e.dataTransfer.setData("text/plain", num.toString()); }} className={`group relative w-12 h-12 flex items-center justify-center rounded-xl text-xl font-black border-4 ${(activeTab === 'bubble' && idx === 5) ? 'border-red-500 bg-white shadow-lg z-10' : (activeTab === 'insertion' && idx === 0) ? `${theme.highlight} border-transparent shadow-none` : 'bg-gray-100 border-gray-200 text-gray-400 shadow-sm'} ${!isTabLocked && !(activeTab === 'insertion' && idx === 0) ? 'hover:bg-white hover:border-blue-400 cursor-grab transition-all' : ''}`}>
+                                            {!(activeTab === 'insertion' && idx === 0) && <div className={`absolute inset-0 z-10 flex items-center justify-center bg-gray-200 rounded-lg text-gray-400 font-black ${!isTabLocked ? 'opacity-100 group-hover:opacity-0' : 'opacity-100'}`}>?</div>}
+                                            <span className={`${!(activeTab === 'insertion' && idx === 0) ? 'opacity-0 ' + (!isTabLocked ? 'group-hover:opacity-100 group-hover:text-black' : '') : 'opacity-100'}`}>{num}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="w-12" />
+                            </div>
+                            <div className="h-px bg-gray-100 w-full" />
+                            <div className="space-y-4 w-full flex flex-col items-center">
+                                {activeTab === 'bubble' ? (
+                                    currentAnswers.map((roundSteps, rIdx) => (
+                                        <div key={rIdx} className="w-full space-y-2">
+                                            {roundSteps.map((stepArr, sIdx) => {
+                                                const totalSteps = roundSteps.length;
+                                                const isLastRound = rIdx === 4;
+                                                const bubblePos = sIdx === totalSteps - 1 ? 5 : (4 - sIdx);
+                                                return (
+                                                    <div key={sIdx} className="flex items-center justify-center w-full gap-4">
+                                                        <div className={`w-32 py-2.5 rounded-xl border-2 ${theme.border} ${theme.secondary} ${theme.text} font-black text-center text-xs shadow-sm`}>第 {rIdx + 1} 輪 第 {sIdx + 1} 回</div>
+                                                        <div className="flex gap-2">
+                                                            {stepArr.map((val, cIdx) => (
+                                                                <SortBox key={cIdx} value={val} id={`${rIdx}-${sIdx}-${cIdx}`} rIdx={rIdx} sIdx={sIdx} cIdx={cIdx} isSorted={cIdx < rIdx} isBubbleBox={!isLastRound && (cIdx === bubblePos)} />
+                                                            ))}
+                                                        </div>
+                                                        <div className="w-12 flex justify-center">
+                                                            {currentResults[rIdx] && currentResults[rIdx][sIdx] !== undefined && (
+                                                                <div className={`p-1.5 rounded-full text-white shadow-lg ${currentResults[rIdx][sIdx] ? 'bg-green-500' : 'bg-red-500 animate-shake'}`}>{currentResults[rIdx][sIdx] ? <IconCheck size={18} /> : <IconX size={18} />}</div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                            <div className="h-2" />
+                                        </div>
+                                    ))
+                                ) : (
+                                    currentAnswers.map((round, rIdx) => (
+                                        <div key={rIdx} className="flex items-center justify-center w-full gap-4">
+                                            <div className={`w-32 py-2.5 rounded-xl border-2 ${theme.border} ${theme.secondary} ${theme.text} font-black text-center text-xs shadow-sm`}>第 {rIdx + 1} 輪結果</div>
+                                            <div className="flex gap-2">
+                                                {round.map((val, cIdx) => {
+                                                    const isSorted = activeTab === 'selection' ? cIdx <= rIdx : cIdx <= rIdx + 1;
+                                                    return <SortBox key={cIdx} value={val} id={`${rIdx}-${cIdx}`} rIdx={rIdx} cIdx={cIdx} isSorted={isSorted} />;
+                                                })}
+                                            </div>
+                                            <div className="w-12 flex justify-center">
+                                                {currentResults[rIdx] !== undefined && (
+                                                    <div className={`p-1.5 rounded-full text-white shadow-lg ${currentResults[rIdx] ? 'bg-green-500' : 'bg-red-500 animate-shake'}`}>{currentResults[rIdx] ? <IconCheck size={18} /> : <IconX size={18} />}</div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                            <div className="mt-6 flex justify-center items-center gap-4">
+                                <button onClick={resetCurrentAlgoOnly} disabled={isTabLocked} className={`px-6 py-3 rounded-2xl bg-white border-2 border-gray-200 font-black text-gray-500 transition-all ${isTabLocked ? 'opacity-30 cursor-not-allowed' : 'hover:bg-gray-50 active:scale-95'}`}>清空重填</button>
+                                <button onClick={checkScore} disabled={syncing || isTabLocked} className={`px-10 py-3 rounded-2xl font-[900] text-xl shadow-xl transition-all ${theme.tab} text-white ${syncing || isTabLocked ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105 active:scale-95'}`}>{isTabLocked ? '已交卷 📝' : '檢查答案 🎯'}</button>
+                                {isTabLocked && phase === 1 && (
+                                    <button onClick={handleEnterPhase2} className="px-8 py-3 rounded-2xl bg-rose-500 text-white font-black text-xl shadow-xl animate-bounce hover:scale-105 transition-all">進入第二戰 🚀</button>
+                                )}
+                            </div>
+                            <div className="w-full pt-6 flex flex-col items-center border-t border-gray-100 mt-6 text-gray-400 text-center">
+                                <div className="flex gap-8">
+                                    <div className="flex flex-col items-center"><span className="text-xs font-black">操作次數</span><span className="text-2xl font-black text-rose-400">{currentStats.drag}</span></div>
+                                    <div className="flex flex-col items-center"><span className="text-xs font-black">測驗時間</span><span className="text-2xl font-black text-sky-400">{currentStats.time} 秒</span></div>
+                                </div>
+                                <div className="mt-2 text-xs font-bold text-slate-400">考生：{studentName}</div>
+                            </div>
+                        </div>
+                    </div>
+                    {showCertificate && (
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={() => setShowCertificate(false)}>
+                            <div className="w-full max-w-4xl bg-white rounded-[40px] p-2 certificate-pop shadow-2xl" onClick={e => e.stopPropagation()}>
+                                <div className="border-[6px] border-dashed border-amber-300 rounded-[34px] pt-4 px-8 pb-6 bg-gradient-to-br from-amber-50 to-orange-50 relative overflow-hidden text-center text-slate-800">
+                                    <div className="absolute top-2 left-4 text-3xl opacity-20">✨</div><div className="absolute bottom-4 right-4 text-3xl opacity-20">✨</div>
+                                    <div className="relative z-10 flex flex-col items-center text-center">
+                                        <h2 className="text-4xl font-[900] text-amber-600 mt-0 mb-4 tracking-widest drop-shadow-sm">榮 譽 證 書</h2>
+                                        <div className="w-full h-px bg-amber-200 mb-4" />
+                                        <div className="text-2xl font-bold mb-6 whitespace-nowrap px-4">恭喜 <span className="text-orange-600 font-black border-b-2 border-amber-500 px-4">{studentName}</span>，經過認真的學習，並且經過嚴格的考驗</div>
+                                        <div className="w-full space-y-4 mb-4 overflow-y-auto max-h-[55vh] custom-scrollbar px-6">
+                                            {Object.keys(historyScores).length > 0 ? (
+                                                Object.entries(historyScores).map(([id, s]) => (
+                                                    <div key={id} className="bg-white/90 p-4 rounded-2xl border-2 border-amber-200 shadow-sm text-xl text-gray-600 w-full text-center whitespace-nowrap">
+                                                        在 <span className="text-orange-600 font-black">{({insertion:'插入', selection:'選擇', bubble:'氣泡'}[s.name])}排序({s.phase===1?'基礎':'挑戰'})</span> 以 <span className="text-red-500 font-black">{s.drag}</span> 次動作，歷時 <span className="text-sky-500 font-black">{s.time}</span> 秒，
+                                                        {s.score === 100 ? (<span className="font-black text-emerald-600 ml-2">完成率 100%，順利完成</span>) : (<span className="font-black text-amber-600 ml-2">完成率 {s.score}%，再接再厲~</span>)}
+                                                    </div>
+                                                ))
+                                            ) : (<div className="py-6 text-gray-400 italic">點擊「檢查答案」後，這裡將紀錄您的測驗戰績！🎖️</div>)}
+                                        </div>
+                                        <div className="mt-2 flex justify-center">
+                                            <button onClick={() => setShowCertificate(false)} className="px-6 py-2 rounded-full bg-amber-500 text-white font-black text-sm hover:bg-amber-600 shadow-lg active:scale-95 transition-all">關閉視窗 🧡</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
